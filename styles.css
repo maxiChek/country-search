@@ -61,6 +61,14 @@ h1 {
   color: var(--error);
 }
 
+.status--empty p {
+  font-weight: 500;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .spinner {
   display: inline-block;
   width: 1rem;

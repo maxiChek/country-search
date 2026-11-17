@@ -216,7 +216,7 @@ function renderResults(cards: CountryCard[]): void {
   statusEl.className = 'status';
 
   if (cards.length === 0) {
-    const p = createElement('p');
+    const p = createElement('p', 'status--empty');
     p.textContent = 'No countries found.';
     statusEl.append(p);
     return;
