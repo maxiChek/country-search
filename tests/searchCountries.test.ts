@@ -1,6 +1,6 @@
-import { searchCountries } from '../src/searchCountries';
-import { HttpError } from '../src/HttpError';
-import type { RawCountry } from '../src/mapCountryResponse';
+import { searchCountries, clearSearchCache } from '../src/searchCountries.js';
+import { HttpError } from '../src/HttpError.js';
+import type { RawCountry } from '../src/mapCountryResponse.js';
 
 function makeRaw(): RawCountry {
   return {
@@ -26,6 +26,7 @@ describe('searchCountries', () => {
   let fetchMock: jest.Mock;
 
   beforeEach(() => {
+    clearSearchCache();
     fetchMock = jest.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });

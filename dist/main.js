@@ -1,45 +1,139 @@
 import { createSearchController } from './searchController.js';
 import { searchCountries } from './searchCountries.js';
-// ---------- DOM Elements ----------
-const searchInput = document.getElementById('search-input');
-const statusEl = document.getElementById('search-status');
-const resultsEl = document.getElementById('results');
-const template = document.getElementById('country-card-template');
+// ---------- UI Initialization ----------
+function createElement(tag, className, attributes) {
+    const el = document.createElement(tag);
+    if (className)
+        el.className = className;
+    if (attributes) {
+        for (const [key, value] of Object.entries(attributes)) {
+            el.setAttribute(key, value);
+        }
+    }
+    return el;
+}
+function initUI() {
+    const app = createElement('main', 'app');
+    const title = createElement('h1');
+    title.textContent = 'Country Search';
+    const searchContainer = createElement('div', 'search');
+    const label = createElement('label', 'visually-hidden', { for: 'search-input' });
+    label.textContent = 'Search countries';
+    const searchInput = createElement('input', '', {
+        id: 'search-input',
+        type: 'search',
+        placeholder: 'Start typing a country name…',
+        autocomplete: 'off',
+        spellcheck: 'false',
+        'aria-describedby': 'search-status',
+    });
+    const historyEl = createElement('div', 'search-history', { id: 'search-history' });
+    searchContainer.append(label, searchInput, historyEl);
+    const statusEl = createElement('div', 'status', {
+        id: 'search-status',
+        role: 'status',
+        'aria-live': 'polite',
+    });
+    const resultsEl = createElement('ul', 'results', {
+        id: 'results',
+        'aria-label': 'Country search results',
+    });
+    app.append(title, searchContainer, statusEl, resultsEl);
+    document.body.append(app);
+    return { searchInput, statusEl, resultsEl, historyEl };
+}
+const { searchInput, statusEl, resultsEl, historyEl } = initUI();
+// ---------- Search History (Bonus) ----------
+const HISTORY_KEY = 'country-search-history';
+const MAX_HISTORY = 5;
+function getHistory() {
+    try {
+        const data = localStorage.getItem(HISTORY_KEY);
+        return data ? JSON.parse(data) : [];
+    }
+    catch {
+        return [];
+    }
+}
+function saveToHistory(query) {
+    const normalized = query.trim();
+    if (!normalized)
+        return;
+    let history = getHistory();
+    // Remove duplicates and add to the beginning
+    history = history.filter((q) => q.toLowerCase() !== normalized.toLowerCase());
+    history.unshift(normalized);
+    // Keep only the last MAX_HISTORY items
+    history = history.slice(0, MAX_HISTORY);
+    try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
+    catch {
+        // Ignore localStorage write errors (e.g., quota exceeded)
+    }
+    renderHistory();
+}
+function renderHistory() {
+    historyEl.replaceChildren();
+    const history = getHistory();
+    if (history.length === 0)
+        return;
+    history.forEach((query) => {
+        const chip = createElement('button', 'history-chip', { type: 'button' });
+        chip.textContent = query;
+        chip.addEventListener('click', () => {
+            searchInput.value = query;
+            controller.search(query);
+        });
+        historyEl.append(chip);
+    });
+}
 // ---------- UI Updates ----------
 function setLoading(loading) {
     if (!loading)
         return;
     statusEl.replaceChildren();
     statusEl.className = 'status';
-    const spinner = document.createElement('span');
-    spinner.className = 'spinner';
-    spinner.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
+    const spinner = createElement('span', 'spinner', { 'aria-hidden': 'true' });
+    const label = createElement('span');
     label.textContent = 'Searching…';
     statusEl.append(spinner, label);
+}
+function createCardNode(card) {
+    const node = createElement('li', 'country-card');
+    const img = createElement('img', 'country-card__flag', {
+        alt: `Flag of ${card.name}`,
+        loading: 'lazy',
+        width: '48',
+        height: '32',
+    });
+    img.src = card.flag;
+    const body = createElement('div', 'country-card__body');
+    const name = createElement('h2', 'country-card__name');
+    name.textContent = card.name;
+    const meta = createElement('p', 'country-card__meta');
+    meta.textContent = [card.capital, card.region, card.population].filter(Boolean).join(' • ');
+    body.append(name, meta);
+    node.append(img, body);
+    return node;
 }
 function renderResults(cards) {
     resultsEl.replaceChildren();
     statusEl.replaceChildren();
     statusEl.className = 'status';
     if (cards.length === 0) {
-        const p = document.createElement('p');
+        const p = createElement('p');
         p.textContent = 'No countries found.';
         statusEl.append(p);
         return;
     }
+    // Save to history ONLY if we got real results
+    if (searchInput.value.trim()) {
+        saveToHistory(searchInput.value);
+    }
     const fragment = document.createDocumentFragment();
     for (const card of cards) {
-        const node = template.content.firstElementChild.cloneNode(true);
-        const img = node.querySelector('.country-card__flag');
-        const name = node.querySelector('.country-card__name');
-        const meta = node.querySelector('.country-card__meta');
-        img.src = card.flag;
-        img.alt = `Flag of ${card.name}`;
-        name.textContent = card.name;
-        // Format the metadata (capital, region, etc.)
-        meta.textContent = [card.capital, card.region].filter(Boolean).join(' • ');
-        fragment.append(node);
+        fragment.append(createCardNode(card));
     }
     resultsEl.append(fragment);
 }
@@ -48,11 +142,9 @@ function renderError(error, retry) {
     statusEl.replaceChildren();
     statusEl.className = 'status status--error';
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const p = document.createElement('p');
+    const p = createElement('p');
     p.textContent = `Something went wrong: ${errorMessage}`;
-    const retryBtn = document.createElement('button');
-    retryBtn.type = 'button';
-    retryBtn.className = 'retry-btn';
+    const retryBtn = createElement('button', 'retry-btn', { type: 'button' });
     retryBtn.textContent = 'Retry';
     retryBtn.addEventListener('click', retry, { once: true });
     statusEl.append(p, retryBtn);
@@ -62,7 +154,6 @@ const controller = createSearchController({
     searchFn: searchCountries,
     onResults: renderResults,
     onError: (error) => {
-        // Pass the current input value to retry the exact same query
         renderError(error, () => controller.search(searchInput.value));
     },
     onLoadingChange: setLoading,
@@ -74,8 +165,9 @@ searchInput.addEventListener('input', (event) => {
     const query = event.target.value;
     controller.search(query);
 });
-// Clean up on page unload
 window.addEventListener('pagehide', () => {
     controller.dispose();
 });
+// Initial render
+renderHistory();
 searchInput.focus();
