@@ -47,7 +47,7 @@ describe('createSearchController', () => {
     await flushMicrotasks();
 
     expect(deps.onResults).toHaveBeenCalledTimes(1);
-    expect(deps.onResults.mock.calls[0][0][0].name).toBe('Spain');
+    expect((deps.onResults as jest.Mock).mock.calls[0][0][0].name).toBe('Spain');
     expect(deps.onLoadingChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -71,7 +71,7 @@ describe('createSearchController', () => {
     await flushMicrotasks();
 
     expect(deps.onResults).toHaveBeenCalledTimes(1);
-    expect(deps.onResults.mock.calls[0][0][0].name).toBe('B');
+    expect((deps.onResults as jest.Mock).mock.calls[0][0][0].name).toBe('B');
   });
 
   it('aborts the previous in-flight request when a new search starts', async () => {
