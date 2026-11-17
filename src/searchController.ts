@@ -1,4 +1,4 @@
-import { mapCountryResponse, type CountryCard, type RawCountry } from './mapCountryResponse';
+import { mapCountryResponse, type CountryCard, type RawCountry } from './mapCountryResponse.js';
 
 export interface SearchControllerDeps {
   searchFn: (query: string, signal: AbortSignal) => Promise<RawCountry[]>;

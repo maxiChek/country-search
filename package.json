@@ -2,10 +2,11 @@
   "name": "country-search",
   "version": "1.0.0",
   "description": "Live countries search by name through countries.dev",
-  "main": "index.js",
+  "main": "dist/main.js",
   "scripts": {
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
