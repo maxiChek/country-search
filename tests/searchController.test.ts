@@ -51,27 +51,57 @@ describe('createSearchController', () => {
     expect(deps.onLoadingChange).toHaveBeenLastCalledWith(false);
   });
 
-  it('discards a stale response when a newer search resolves first', async () => {
-    const resolvers: Array<(v: RawCountry[]) => void> = [];
-    const searchFn = jest.fn(() => new Promise<RawCountry[]>((r) => resolvers.push(r)));
-    const deps = makeDeps({ searchFn });
-    const ctrl = createSearchController(deps);
+  it('handles race condition and aborts stale request via signal (strict README requirement)', async () => {
+    const onResults = jest.fn();
+    const onError = jest.fn();
+    const pendingPromises: Array<{
+      resolve: (val: RawCountry[]) => void;
+      reject: (err: Error) => void;
+      signal: AbortSignal;
+    }> = [];
 
+    // Strict Mock: reacts to the signal and rejects with AbortError
+    const searchFn = jest.fn((_query: string, signal: AbortSignal) => {
+      return new Promise<RawCountry[]>((resolve, reject) => {
+        pendingPromises.push({ resolve, reject, signal });
+
+        signal.addEventListener('abort', () => {
+          const err = new Error('Aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    });
+
+    const ctrl = createSearchController(makeDeps({ searchFn, onResults, onError }));
+
+    // 1. First search (will be aborted)
     ctrl.search('a');
     await jest.advanceTimersByTimeAsync(300);
+    const req1 = pendingPromises[0];
 
+    // 2. Second search (will resolve first)
     ctrl.search('b');
     await jest.advanceTimersByTimeAsync(300);
+    const req2 = pendingPromises[1];
 
-    expect(resolvers).toHaveLength(2);
+    // Check that the first request was physically aborted
+    expect(req1.signal.aborted).toBe(true);
 
-    resolvers[1]([makeRaw('B')]);
+    // 3. Second request resolves normally
+    req2.resolve([makeRaw('B')]);
     await flushMicrotasks();
-    resolvers[0]([makeRaw('A')]);
+
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect((onResults as jest.Mock).mock.calls[0][0][0].name).toBe('B');
+
+    // 4. Simulate the first request resolving late (even though it was aborted,
+    req1.resolve([makeRaw('A')]);
     await flushMicrotasks();
 
-    expect(deps.onResults).toHaveBeenCalledTimes(1);
-    expect((deps.onResults as jest.Mock).mock.calls[0][0][0].name).toBe('B');
+    // CRITICAL CHECKS:
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it('aborts the previous in-flight request when a new search starts', async () => {

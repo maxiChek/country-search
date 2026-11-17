@@ -7,35 +7,6 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app">
-      <h1>Country Search</h1>
-
-      <div class="search">
-        <label for="search-input" class="visually-hidden">Search countries</label>
-        <input
-          id="search-input"
-          type="search"
-          placeholder="Start typing a country name…"
-          autocomplete="off"
-          spellcheck="false"
-          aria-describedby="search-status"
-        />
-      </div>
-
-      <div id="search-status" class="status" role="status" aria-live="polite"></div>
-
-      <ul id="results" class="results" aria-label="Country search results"></ul>
-
-      <template id="country-card-template">
-        <li class="country-card">
-          <img class="country-card__flag" alt="" loading="lazy" width="48" height="32" />
-          <div class="country-card__body">
-            <h2 class="country-card__name"></h2>
-            <p class="country-card__meta"></p>
-          </div>
-        </li>
-      </template>
-    </main>
     <script type="module" src="./dist/main.js"></script>
   </body>
 </html>
