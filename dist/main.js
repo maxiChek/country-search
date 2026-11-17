@@ -38,12 +38,37 @@ function initUI() {
         id: 'results',
         'aria-label': 'Country search results',
     });
-    app.append(title, searchContainer, statusEl, resultsEl);
+    // --- Detailed View (Dialog) ---
+    const dialog = createElement('dialog', 'country-dialog', { id: 'country-dialog' });
+    const dialogContent = createElement('div', 'dialog-content');
+    const dialogClose = createElement('button', 'dialog-close', {
+        type: 'button',
+        'aria-label': 'Close',
+    });
+    dialogClose.textContent = '×';
+    const dialogImg = createElement('img', 'dialog-flag', { alt: '' });
+    const dialogName = createElement('h2', 'dialog-name');
+    const dialogMeta = createElement('p', 'dialog-meta');
+    const dialogLanguages = createElement('p', 'dialog-languages');
+    dialogContent.append(dialogClose, dialogImg, dialogName, dialogMeta, dialogLanguages);
+    dialog.append(dialogContent);
+    app.append(title, searchContainer, statusEl, resultsEl, dialog);
     document.body.append(app);
-    return { searchInput, statusEl, resultsEl, historyEl };
+    return {
+        searchInput,
+        statusEl,
+        resultsEl,
+        historyEl,
+        dialog,
+        dialogClose,
+        dialogImg,
+        dialogName,
+        dialogMeta,
+        dialogLanguages,
+    };
 }
-const { searchInput, statusEl, resultsEl, historyEl } = initUI();
-// ---------- Search History (Bonus) ----------
+const { searchInput, statusEl, resultsEl, historyEl, dialog, dialogClose, dialogImg, dialogName, dialogMeta, dialogLanguages, } = initUI();
+// ---------- Search History ----------
 const HISTORY_KEY = 'country-search-history';
 const MAX_HISTORY = 5;
 function getHistory() {
@@ -60,16 +85,14 @@ function saveToHistory(query) {
     if (!normalized)
         return;
     let history = getHistory();
-    // Remove duplicates and add to the beginning
     history = history.filter((q) => q.toLowerCase() !== normalized.toLowerCase());
     history.unshift(normalized);
-    // Keep only the last MAX_HISTORY items
     history = history.slice(0, MAX_HISTORY);
     try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     }
     catch {
-        // Ignore localStorage write errors (e.g., quota exceeded)
+        // Ignore write errors
     }
     renderHistory();
 }
@@ -99,8 +122,24 @@ function setLoading(loading) {
     label.textContent = 'Searching…';
     statusEl.append(spinner, label);
 }
+function showCountryDetails(card) {
+    dialogImg.src = card.flag;
+    dialogImg.alt = `Flag of ${card.name}`;
+    dialogName.textContent = card.name;
+    dialogMeta.textContent = `Capital: ${card.capital} • Region: ${card.region} • Population: ${card.population.toLocaleString()}`;
+    if (card.languages.length > 0) {
+        dialogLanguages.textContent = `Languages: ${card.languages.join(', ')}`;
+        dialogLanguages.style.display = 'block';
+    }
+    else {
+        dialogLanguages.style.display = 'none';
+    }
+    dialog.showModal();
+}
 function createCardNode(card) {
     const node = createElement('li', 'country-card');
+    node.tabIndex = 0; // Make focusable for keyboard users
+    node.setAttribute('role', 'button');
     const img = createElement('img', 'country-card__flag', {
         alt: `Flag of ${card.name}`,
         loading: 'lazy',
@@ -112,9 +151,17 @@ function createCardNode(card) {
     const name = createElement('h2', 'country-card__name');
     name.textContent = card.name;
     const meta = createElement('p', 'country-card__meta');
-    meta.textContent = [card.capital, card.region, card.population].filter(Boolean).join(' • ');
+    meta.textContent = [card.capital, card.region].filter(Boolean).join(' • ');
     body.append(name, meta);
     node.append(img, body);
+    // Add click and keyboard listeners for detailed view
+    node.addEventListener('click', () => showCountryDetails(card));
+    node.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            showCountryDetails(card);
+        }
+    });
     return node;
 }
 function renderResults(cards) {
@@ -127,7 +174,6 @@ function renderResults(cards) {
         statusEl.append(p);
         return;
     }
-    // Save to history ONLY if we got real results
     if (searchInput.value.trim()) {
         saveToHistory(searchInput.value);
     }
@@ -165,9 +211,20 @@ searchInput.addEventListener('input', (event) => {
     const query = event.target.value;
     controller.search(query);
 });
+dialogClose.addEventListener('click', () => dialog.close());
+// Close dialog when clicking on the backdrop (outside the content area)
+dialog.addEventListener('click', (e) => {
+    const rect = dialog.getBoundingClientRect();
+    const isInDialog = rect.top <= e.clientY &&
+        e.clientY <= rect.top + rect.height &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.left + rect.width;
+    if (!isInDialog) {
+        dialog.close();
+    }
+});
 window.addEventListener('pagehide', () => {
     controller.dispose();
 });
-// Initial render
 renderHistory();
 searchInput.focus();

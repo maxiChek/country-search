@@ -1,10 +1,11 @@
 export interface RawCountry {
-  name: string | { common: string }; // Supports both string and object
+  name: string | { common: string };
   flags: { svg: string; png: string };
-  capital?: string | string[]; // Supports both string and array
+  capital?: string | string[];
   region: string;
   population: number;
-  languages?: Record<string, string>;
+  // API can return various shapes for languages
+  languages?: Record<string, string> | Array<{ name: string }> | Record<string, { name: string }>;
 }
 
 export interface CountryCard {
@@ -17,9 +18,25 @@ export interface CountryCard {
 }
 
 export function mapCountryResponse(raw: RawCountry): CountryCard {
-  // Handle both API and test data formats
+  // Handle name (string or object)
   const name = typeof raw.name === 'string' ? raw.name : raw.name.common;
+
+  // Handle capital (string or array)
   const capital = Array.isArray(raw.capital) ? raw.capital[0] : raw.capital;
+
+  // Handle languages (array of objects, object of strings, object of objects)
+  let languages: string[] = [];
+  if (raw.languages) {
+    if (Array.isArray(raw.languages)) {
+      // If it's an array: [{ name: "English" }, { name: "Spanish" }]
+      languages = raw.languages.map((l) => (typeof l === 'string' ? l : l.name));
+    } else {
+      // If it's an object: { eng: "English" } OR { eng: { name: "English" } }
+      languages = Object.values(raw.languages).map((l) =>
+        typeof l === 'string' ? l : (l as { name: string }).name,
+      );
+    }
+  }
 
   return {
     name,
@@ -27,6 +44,6 @@ export function mapCountryResponse(raw: RawCountry): CountryCard {
     capital: capital ?? '—',
     region: raw.region,
     population: raw.population,
-    languages: raw.languages ? Object.values(raw.languages) : [],
+    languages: languages.filter(Boolean), // Clean up any undefined/null
   };
 }
